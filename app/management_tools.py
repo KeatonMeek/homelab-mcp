@@ -10,7 +10,9 @@ from pydantic import Field
 
 MAX_FRAME = 1048576
 MAX_FILE_BYTES = 131072
-AbsolutePath = Annotated[str, Field(min_length=1, max_length=4096, pattern=r"^/")]
+# Match the entire absolute path for clients using full-match schema validation.
+# [\s\S] preserves valid POSIX filenames containing newlines without regex flags.
+AbsolutePath = Annotated[str, Field(min_length=1, max_length=4096, pattern=r"^/[\s\S]*$")]
 JobID = Annotated[str, Field(pattern=r"^[0-9a-f]{32}$")]
 Timeout = Annotated[int, Field(strict=True, ge=1, le=3600)]
 OutputLimit = Annotated[int, Field(strict=True, ge=1024, le=131072)]
