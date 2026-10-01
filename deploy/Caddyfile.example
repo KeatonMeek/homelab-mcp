@@ -1,0 +1,6 @@
+# Alternative: Caddy on the same Linux host. Replace the example hostname.
+mcp.example.com {
+    reverse_proxy 127.0.0.1:8080 {
+        header_up Host mcp.example.com
+    }
+}

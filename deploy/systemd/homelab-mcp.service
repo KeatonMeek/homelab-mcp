@@ -1,0 +1,27 @@
+[Unit]
+Description=Homelab MCP authenticated frontend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=homelab-mcp
+Group=homelab-mcp
+WorkingDirectory=/opt/homelab-mcp
+Environment=HOMELAB_CONFIG_FILE=/etc/homelab-mcp/settings.json
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=FASTMCP_ENABLE_RICH_LOGGING=false
+ExecStart=/opt/homelab-mcp/.venv/bin/python -B -m app.server
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/homelab-mcp
+RestrictSUIDSGID=true
+LimitNOFILE=1024
+
+[Install]
+WantedBy=multi-user.target

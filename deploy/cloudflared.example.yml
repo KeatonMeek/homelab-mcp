@@ -1,0 +1,10 @@
+# Optional reverse-proxy example. Keep actual tunnel files outside the repository.
+# Authenticate/provision cloudflared separately using its official documentation.
+tunnel: REPLACE_WITH_TUNNEL_UUID
+credentials-file: /etc/cloudflared/tunnel-credentials.json
+ingress:
+  - hostname: mcp.example.com
+    service: http://127.0.0.1:8080
+    originRequest:
+      httpHostHeader: mcp.example.com
+  - service: http_status:404

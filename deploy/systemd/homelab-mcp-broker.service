@@ -1,0 +1,23 @@
+# OPTIONAL: do not enable until intentionally permitting arbitrary commands.
+[Unit]
+Description=Homelab MCP optional same-user execution broker
+After=network.target
+
+[Service]
+Type=simple
+User=homelab-mcp
+Group=homelab-mcp
+WorkingDirectory=/opt/homelab-mcp
+EnvironmentFile=/etc/homelab-mcp/broker.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/homelab-mcp/.venv/bin/python -B -m app.execution_broker
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=homelab-mcp
+RuntimeDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+LimitNOFILE=1024
+
+[Install]
+WantedBy=multi-user.target

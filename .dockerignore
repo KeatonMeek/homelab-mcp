@@ -1,0 +1,6 @@
+**
+!app/
+!app/*.py
+!requirements.lock
+!deploy/
+!deploy/Dockerfile*

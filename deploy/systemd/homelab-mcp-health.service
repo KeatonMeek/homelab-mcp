@@ -1,0 +1,14 @@
+[Unit]
+Description=Homelab MCP metadata-only host health snapshot
+
+[Service]
+Type=oneshot
+User=homelab-mcp
+Group=homelab-mcp
+WorkingDirectory=/opt/homelab-mcp
+ExecStart=/opt/homelab-mcp/.venv/bin/python -B host/collect_health.py --output /var/lib/homelab-mcp/health/health.json --mount /
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/homelab-mcp/health
