@@ -1,31 +1,54 @@
-# Preparation validation
+# Testing and deployment checks
 
-Checked on 2026-10-01 in a Linux cloud workspace using Python 3.12. This records source-package validation, not a live deployment certification.
+Use automated tests to check the source and separate live checks to verify an installation. GitHub Actions runs the repository's test workflow on pushes and pull requests; consult the run for the exact commit you intend to use.
 
-## Passed
+## Local test suite
 
-- Clean virtual environment installation from `requirements.lock` with `pip --require-hashes`
-- `pip check`: no broken requirements
-- Python compilation for app, collector, scripts and tests
-- Ruff 0.16.10 `F,E9` checks: no findings (focused fatal/unused checks, not a complete style/security audit)
-- Unit/fixture integration suite: 45 tests executed, 44 passed
-- Authentication rejection for absent/wrong owner/missing scope; intended owner path
-- Exact callback restrictions, encrypted OAuth-state persistence, disabled-by-default tool registration
-- Opt-in trusted CIMD/JWKS and ChatGPT-style private_key_jwt fixture verification, including the actual FastMCP discovery/token HTTP routes, rejected untrusted URLs/private DNS/redirects, signature/issuer/audience/expiry/replay checks and no stale fallback
-- The fixture token request passed client authentication and then rejected its intentionally nonexistent authorization code; no real user authorization-code exchange was performed
-- ASGI loopback/Host/Origin/forwarding and bounded request-body checks, including an escaped 128 KiB file payload
-- Disposable broker command/file/job, timeout, output-bound, cancellation, audit and opt-in tests
-- Generic collector, configuration and snapshot tests
-- JSON, YAML and TOML parse checks
-- Public-tree heuristic checks and targeted manual check for known deployment-specific identifiers
+On Linux with Python 3.12, from the repository root:
 
-## Not established
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install --require-hashes -r requirements.lock
+.venv/bin/python -m pip check
+.venv/bin/python -m compileall -q app host scripts tests
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python scripts/check_public_tree.py
+```
 
-- One real AF_UNIX socket test was skipped because this workspace prohibits Unix socket creation. Mocked broker protocol tests passed; real socket transport must run on an ordinary Linux test host.
-- systemd unit verification was blocked by the workspace's read-only `/run/systemd`; installing/starting units was not attempted.
-- No Docker executable was available; neither image was built here.
-- No live GitHub OAuth round trip, actual MCP client connection, tunnel/TLS routing or wrong-owner live login was tested.
-- No root/privileged container or namespace operation, production installer, migration or service change was run.
-- No independent original private-history audit, comprehensive secret scan, dependency vulnerability audit or security certification is implied.
+The suite covers:
 
-The release starts with fresh Git history; no private repository history is inherited. Source archives exclude Git metadata. Complete the release checklist and review the actual candidate commit before public publication. Changes after this validation require affected checks to be rerun.
+- Owner authorization, exact callbacks, encrypted state, and default tool registration.
+- Trusted client metadata and signing-key retrieval, client assertions, and rejected untrusted destinations.
+- Loopback, Host, Origin, request-body, and broker protocol checks.
+- Exported tool schemas, including absolute paths under full-match client validation.
+- Disposable command, file, job, timeout, cancellation, output-bound, and audit fixtures.
+- Configuration, health collection, and snapshot handling.
+
+Tests do not use live OAuth credentials, deploy services, or enter host namespaces. The real Unix-socket test may skip in environments that prohibit socket creation. Run it on an ordinary Linux test host before relying on broker transport.
+
+`check_public_tree.py` checks for selected credential patterns and runtime files. Use it alongside manual review; it is not a comprehensive secret scanner or security audit.
+
+## Container builds
+
+Build both images from a clean checkout on a Linux machine with Docker:
+
+```sh
+docker build -f deploy/Dockerfile -t homelab-mcp:test .
+docker build -f deploy/Dockerfile.broker -t homelab-mcp-broker:test .
+```
+
+Building the broker image does not enable execution. Review [deployment configuration](setup.md) and [execution modes](execution.md) separately before starting containers. For systemd installations, validate the adapted unit files with `systemd-analyze verify` on the target distribution before enabling them.
+
+## Live installation checks
+
+Use a test installation or a planned maintenance window, with an independent recovery path:
+
+1. Verify HTTPS routing, discovery, and exact callback settings.
+2. Confirm unauthenticated requests cannot call tools and a different GitHub account cannot access the owner's tools.
+3. Connect the intended MCP client, call `probe`, and check that `health` reports a current snapshot.
+4. Confirm command and file tools are absent when execution is disabled.
+5. If execution is enabled, use disposable files and harmless commands to check account identity, file operations, output limits, timeouts, job status, and cancellation through the actual client.
+6. Refresh client tool discovery after schema changes. Verify exported tools as well as direct broker behavior.
+7. Check planned restart recovery, saved authentication, and your rollback procedure before routine use.
+
+Record the tested commit and results privately without credentials or sensitive output. A passing test suite or container restart does not establish whole-host reboot recovery or compatibility with every client. Review [Security](../SECURITY.md) for the permission model and operational limits.

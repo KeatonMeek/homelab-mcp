@@ -1,31 +1,31 @@
 # Release checklist
 
-The prepared tree is source code, not proof of a production deployment. The project is MIT-licensed. Publication and deployment remain separate operator actions.
+Use this checklist for a candidate release. Source publication, image builds, and deployment are separate actions.
 
-## Privacy and ownership
+## Source and documentation
 
-- [ ] Use a fresh repository/history; do not change an existing private repository's visibility
-- [ ] Review every prospective tracked file, including hidden files, tests, workflow logs and examples
-- [ ] Exclude all runtime config/state, credentials, domain/account identifiers, host paths, logs, screenshots and private-history artifacts
-- [ ] Run `python scripts/check_public_tree.py`; understand that it is a limited heuristic, not a full secret scanner
-- [ ] Run an independent reputable secret scan and manual content review before publication
-- [ ] Verify the commit author/committer identity with the owner; use an approved GitHub noreply address if privacy is desired
-- [x] MIT License and copyright attribution approved; see [licensing](licensing.md)
-- [ ] Confirm intended repository owner, public visibility, name and description
-- [ ] Configure private vulnerability reporting or a maintainer reporting contact
+- [ ] Review the diff, including examples, tests, workflow changes, and dependency updates.
+- [ ] Check README commands, configuration names, relative links, and client setup instructions against the implementation.
+- [ ] Keep runtime configuration, credentials, state, logs, snapshots, and private deployment identifiers outside the repository.
+- [ ] Run `python scripts/check_public_tree.py`, an independent secret scan, and manual review of the files to be published.
+- [ ] Preserve the MIT License and required third-party notices; see [Licensing](licensing.md).
+- [ ] Review the repository's private vulnerability reporting options and keep [reporting guidance](../SECURITY.md#reporting) current.
 
-## Reproducibility and behavior
+## Build and behavior
 
-- [ ] Python 3.12 clean-venv install from hash-locked dependencies succeeds; `pip check` passes
-- [ ] Compile all Python files; run full unit/integration fixture suite
-- [ ] Review transitive dependencies/advisories; version pins do not certify safety
-- [ ] Validate workflow and deployment examples; pin GitHub Actions to reviewed immutable commits before hardened release if desired
-- [ ] Build application/broker images on an authorized disposable Linux environment and review image findings
-- [ ] Check real TLS/proxy routing, owner login, no-auth and wrong-owner rejection
-- [ ] Check execution tools are absent by default and broker rejects disabled execution
-- [ ] If offering root mode, separately test harmless namespace operations on a disposable host
-- [ ] Verify backup, key rotation, restart, stale socket, audit-full and rollback procedures
+- [ ] Install from the hash-locked dependencies in a clean Python 3.12 environment and run `pip check`.
+- [ ] Compile Python files and run the full test suite, including real Unix-socket transport on Linux.
+- [ ] Review dependency advisories and changes to Docker base images, OS packages, and GitHub Actions references.
+- [ ] Build the application and broker images from the candidate source.
+- [ ] Validate adapted systemd units and proxy configuration where those deployment methods are being supported.
+- [ ] Follow the [live installation checks](validation.md#live-installation-checks) for the affected client and deployment paths.
+- [ ] Review recovery procedures affected by the change, including authentication state, broker sockets, audit rotation, and rollback.
 
-## Publish only after approval
+## Publish
 
-Create the repository with only the reviewed tree and fresh history. Verify the pushed commit and CI status. Do not deploy, enable root access or migrate an existing server merely because the code was published. Keep the status honest: indicate which live checks remain unrun and avoid universal client/subscription or security claims.
+- [ ] Confirm the candidate commit, intended repository, and commit attribution.
+- [ ] Verify the pushed commit and its CI result.
+- [ ] Describe user-visible changes, configuration changes, and required upgrade steps.
+- [ ] Identify what was tested without treating fixtures as evidence of a live deployment.
+
+When publishing a project derived from a private installation, prepare a reviewed public tree with fresh history. Do not change the visibility of a private deployment repository or import its configuration and history. See [Migration](migration.md) for separating source, configuration, and runtime state.
