@@ -1,6 +1,12 @@
 # Setup
 
-This guide describes actions for the operator to review and run on their own Linux host. It is not an installer. Start without execution tools and keep an independent SSH/console recovery path.
+This guide covers a Linux runtime on a physical machine, VM, or VPS. A dedicated server is not required. Windows users can connect to a remote installation or explore the untested [WSL2 hosting route](platforms.md). Run the shell commands inside the chosen Linux environment. Start without execution tools and keep an independent SSH/console recovery path.
+
+## Before you begin
+
+Use Python 3.12 with venv support, Git, Bash, and a Linux account with a real home directory. The routing checks below also use `curl`. Verify `python3.12 --version` and `/bin/bash` before following the [installation commands](../README.md#2-install-the-project). Do not run the frontend as root. An internet-facing connection also needs a domain, an HTTPS proxy or tunnel, GitHub OAuth App credentials, and a compatible MCP client's exact callback.
+
+For a first installation, keep the frontend, collector, and proxy in the same Linux environment. Keep optional execution disabled until health and authentication work. The [platform guide](platforms.md) explains guest boundaries, container loopback, filesystem requirements, and Windows-hosted testing.
 
 ## 1. Authentication and HTTPS
 
@@ -14,6 +20,31 @@ The frontend requires GitHub OAuth and owner authorization; putting a tunnel in 
 
 Provider reference: [FastMCP GitHub authentication](https://gofastmcp.com/integrations/github), [FastMCP OAuth proxy](https://gofastmcp.com/servers/auth/oauth-proxy), [GitHub OAuth Apps](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app).
 
+### Routing checks
+
+Create the private configuration and start the frontend as described below, then run this inside its network namespace. Replace the example hostname consistently:
+
+```sh
+curl --fail --silent --show-error \
+  -H 'Host: mcp.example.com' \
+  http://127.0.0.1:8080/.well-known/oauth-authorization-server
+```
+
+Expect JSON discovery metadata with your HTTPS issuer and authorization/token endpoints. From another machine, check the public route:
+
+```sh
+curl --fail --silent --show-error \
+  https://mcp.example.com/.well-known/oauth-authorization-server
+
+curl --silent --show-error --output /dev/null --write-out '%{http_code}\n' \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  --data '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+  https://mcp.example.com/mcp
+```
+
+The unauthenticated MCP POST should return `401`. A GET to `/mcp` may return `405` with this stateless transport and is not the equivalent authentication test. If a proxy returns its own error page, identify that layer before changing application settings. A request sent to `localhost` without the configured public Host will be rejected intentionally.
+
 ## 2. Local-user startup
 
 Install Python 3.12 using your distribution's supported method. Clone or copy the generic source; do not place secrets in that checkout. Create a venv and install the hashed lock as shown in the README.
@@ -22,9 +53,25 @@ Run `scripts/create_config.py --directory "$HOME/.config/homelab-mcp"` with the 
 
 The wizard writes explicit absolute paths. Move the configuration only after adjusting those paths. Runtime startup refuses missing values, malformed callbacks, invalid keys and unsafe token-state permissions. There are no fallback keys or automatic `.env` reads.
 
+The resulting private directory contains `settings.json` and separate `oauth`, `health`, `audit`, and `run` directories. The wizard creates a health-only configuration; the unused broker socket path is still recorded so you can enable it later.
+
 Collect a health snapshot, then start the server using the README commands. The collector can run without root. Missing Docker/journal permissions are reported as unavailable and do not require privilege escalation. Run it approximately once per minute using the provided timer or your existing scheduler.
 
 Configure the client with `https://mcp.example.com/mcp`, sign in with the configured GitHub account and approve the requested `read:user` scope. Test `probe` first, then `health`. Confirm that the shell/file tools are absent. A different GitHub account must not gain access.
+
+### Collect the information you need
+
+The basic collector reports `/` storage and leaves Docker collection disabled. For an installation that already has Docker read access and a data mount, use:
+
+```sh
+.venv/bin/python host/collect_health.py \
+  --output "$HOME/.config/homelab-mcp/health/health.json" \
+  --docker --mount / --mount /mnt/data
+```
+
+Replace `/mnt/data` with a path in the collector's own environment. The collector invokes `/usr/bin/docker`; verify that binary and the intended Docker daemon are available to its account. Missing utilities or permissions can make individual sections unavailable. On WSL2, the snapshot represents the Linux distribution; on a VM, it represents the guest.
+
+For persistent collection, keep those same flags and output path in your timer or scheduler. The reference timer runs roughly every minute, and `health` marks snapshots stale after three minutes.
 
 ## 3. Configuration reference
 
@@ -78,3 +125,27 @@ For Docker health, the collector's `--docker` flag opts into querying existing D
 - Backups and an independent login work
 
 Real client OAuth, tunnel routing and wrong-owner integration checks require a deployment; fixture tests alone do not establish them. Don't capture credential-bearing request/response bodies while diagnosing issues.
+
+## 6. First execution checks
+
+Use the [same-user broker instructions](execution.md#same-user-mode-recommended-first) after your health-only connection works. Set the private frontend `HOMELAB_ENABLE_EXECUTION` string to `true`, enable the broker separately, and use the same socket path and account. Start the broker, restart the frontend, and refresh your client's tool discovery. The examples below are requests to send through the client, not shell commands to paste into PowerShell.
+
+| Tool | First request | Expected result |
+| --- | --- | --- |
+| `command_run` | `command="id -u; pwd"`, `cwd="/tmp"` | The broker account's UID and `/tmp` |
+| `file_write` | A new, uniquely named `/tmp` file containing a short non-secret marker | A successful write result |
+| `file_read` | Read that same fixture path | The original marker |
+| `file_move` | Move the fixture to another unused `/tmp` name | The new path and move result |
+| `command_start` | `command="printf started; sleep 30"`, `cwd="/tmp"` | A job ID |
+| `job_status`, `job_output` | Use the returned job ID | State and bounded output |
+| `job_cancel` | Cancel the still-running fixture job | A cancelled state |
+
+Choose unique fixture names and remove only those fixtures when done. An execution result can describe an operation failure even when the MCP request itself succeeded; check return codes and error fields. The [execution guide](execution.md) explains limits and the [recovery guide](recovery.md) covers stale sockets, audit rotation, and retry decisions.
+
+## 7. Make the installation persistent
+
+For a native Linux or VM installation, adapt the systemd paths and account in section 4. The local-user quickstart uses a home-directory configuration; the supplied system units use `/opt`, `/etc`, and `/var/lib`. Do not mix those layouts without updating configuration and ownership consistently.
+
+For a WSL2 trial, verify systemd availability and separately test Windows/WSL startup, sleep, networking, and reconnection as described in [Platforms](platforms.md#4-verify-operation-and-availability). For containers, configure restart behavior, persistent private mounts, and the proxy's shared network namespace explicitly. No example here installs a Windows service or starts a native PowerShell broker.
+
+Before depending on any deployment, run the [live installation checks](validation.md#live-installation-checks), preserve private rollback material, and confirm the expected environment through the actual MCP client.
